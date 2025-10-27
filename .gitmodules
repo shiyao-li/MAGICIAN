@@ -1,0 +1,3 @@
+[submodule "RaDe-GS"]
+	path = RaDe-GS
+	url = https://github.com/HKUST-SAIL/RaDe-GS.git

@@ -1,0 +1,16 @@
+{
+  "numGPU": 1,
+  "dataset_path": "./data/scenes",
+  "test_scenes": [
+    "stair"
+  ],
+  "params_name": "macarons_default_training_config.json",
+  "model_name": "trained_macarons.pth",
+  "results_json_name": "ratios_2.json",
+  "test_resolution": 0.05,
+  "use_perfect_depth_map": true,
+  "compute_collision": false,
+  "load_json": false,
+  "random_seed": 8,
+  "torch_seed": 9
+}

@@ -1,0 +1,14 @@
+{
+  "numGPU": 0,
+  "data_path": "./data/ShapeNetCore.v1",
+  "params_name": "scone_vis_pretraining_config.json",
+  "scone_occ_model_name": "pretrained_scone_occ.pth",
+  "scone_vis_model_name": "pretrained_scone_vis.pth",
+  "pc_size": 1024,
+  "n_view_max": 10,
+  "test_novel": false,
+  "test_number": -1,
+  "random_seed": 42,
+  "torch_seed": 5,
+  "results_json_name": "full_test_results_pretrained_scone.json"
+}

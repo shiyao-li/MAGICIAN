@@ -1,0 +1,161 @@
+{
+  "_GPU_management": {
+    "ddp": true,
+    "jz": false,
+    "CUDA_VISIBLE_DEVICES": "0, 1, 2, 3",
+    "WORLD_SIZE": 4
+  },
+  "_monitoring": {
+    "compute_time": true,
+    "check_gradients": false,
+    "anomaly_detection": false,
+    "empty_cache_every_n_batch": 10,
+    "reload_previous_model_if_bad_loss": true,
+    "loss_peak_threshold": 0.015
+  },
+  "_data": {
+    "data_path": "./data/scenes",
+    "train_scenes": [
+      "dunnottar",
+      "pisa",
+      "bannerman",
+      "redeemer",
+      "pantheon",
+      "fushimi",
+      "liberty",
+      "colosseum"
+    ],
+    "val_scenes": [
+      "alhambra",
+      "neuschwanstein"
+    ],
+    "test_scenes": [
+      "bridge",
+      "eiffel"
+    ],
+    "data_augmentation": true,
+    "jitter_probability": 1.0,
+    "brightness_jitter_range": 0.2,
+    "contrast_jitter_range": 0.2,
+    "saturation_jitter_range": 0.2,
+    "hue_jitter_range": 0.1,
+    "symmetry_probability": 0.5,
+    "axis_to_mirror": [
+      0, 1, 2
+    ],
+    "scene_scale_factor": 10.0
+  },
+  "_camera_management": {
+    "image_height": 256,
+    "image_width": 456,
+    "ambient_light_intensity": 0.85,
+    "gathering_factor": 0.05,
+    "sensor_range": 70.0,
+    "n_interpolation_steps": 4,
+    "n_poses_in_trajectory": 100
+  },
+  "_scene_management": {
+    "n_proxy_points": 100000,
+    "proxy_cell_resolution": 0.001,
+    "proxy_cell_capacity": 100000,
+    "score_threshold": 0.95,
+    "carving_tolerance": 10.0,
+    "surface_cell_capacity": 1000,
+    "recompute_surface_every_n_loop": 20,
+    "progressive_fill": true,
+    "max_points_per_progressive_fill": 1000,
+    "n_gt_surface_points": 100000,
+    "surface_epsilon_factor": 1.0,
+    "distance_factor_th": 17.0,
+    "remap_every_n_poses": 95
+  },
+  "_depth_module": {
+    "use_perfect_depth": false,
+    "training_mode": "self_supervised",
+    "ssim_window_size": 5,
+    "ssim_sigma": 1.5,
+    "ssim_padding": 2,
+    "ssim_factor": 0.85,
+    "use_depth_mask": true,
+    "learn_pose": false,
+    "rotation_mode": "angle",
+    "height": 256,
+    "width": 456,
+    "znear": 0.5,
+    "zfar": 750,
+    "min_gt_factor": 1e-08,
+    "max_gt_factor": 1.0,
+    "n_depth": 96,
+    "n_alpha": 2,
+    "alphas": [
+      -1,
+      -2,
+      1
+    ],
+    "use_future_frame_for_supervision": true,
+    "n_alpha_for_supervision": 3,
+    "pose_factor": 100,
+    "padding_mode": "border",
+    "regularity_loss": true,
+    "regularity_factor": 0.001
+  },
+  "_scone_modules": {
+    "view_state_n_elev": 7,
+    "view_state_n_azim": 14,
+    "harmonic_degree": 8,
+    "n_harmonics": 64,
+    "n_view_state_cameras": 98,
+    "k_for_knn": 16,
+    "prediction_neighborhood_size": 3,
+    "n_proxy_point_for_occupancy_supervision": 6000,
+    "min_occ_for_proxy_points": 0.1,
+    "use_occ_to_sample_proxy_points": true,
+    "seq_len": 2048,
+    "n_freeze_epochs": 0,
+    "occ_loss_fn": "mse",
+    "cov_loss_fn": "uncentered_l1"
+  },
+  "_memory_replay": {
+    "memory_dir_name": "macarons_memory_no_pretraining",
+    "n_memory_trajectories": 5,
+    "n_memory_loops": 4,
+    "n_memory_samples": 4,
+    "n_memory_scene_loops": 1,
+    "save_depth_every_n_frame": 4,
+    "n_max_memory_depths_for_partial_pc": 30,
+    "coarse_surface_max_size": 16384,
+    "memory_supervise_with_online_field": false,
+    "memory_max_curriculum_index": 50,
+    "random_poses_in_memory_scene_loops": true,
+    "n_poses_in_memory_scene_loops": 8
+  },
+  "_general_training": {
+    "start_from_scratch": true,
+    "pretrained": true,
+    "online_learning": true,
+    "pretrained_model_path": "initialized_macarons.pth",
+    "total_batch_size": 4,
+    "batch_size": 1,
+    "process_batch_size": 1,
+    "epochs": 50,
+    "depth_learning_rate": 0.0001,
+    "scone_learning_rate": 0.0001,
+    "schedule_learning_rate": true,
+    "depth_lr_epochs": [
+      50
+    ],
+    "scone_lr_epochs": [
+      50
+    ],
+    "lr_factor": 0.1,
+    "save_model_every_n_epoch": 3,
+    "noam_opt": false,
+    "depth_warmup": 200,
+    "scone_warmup": 1200,
+    "warmup_phase": 1,
+    "multiply_loss": false,
+    "random_seed": 8,
+    "torch_seed": 9
+  },
+  "macarons_model_name": "trained_macarons_no_pretraining"
+}

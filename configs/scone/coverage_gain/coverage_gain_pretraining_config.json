@@ -1,0 +1,78 @@
+{
+  "_GPU_management": {
+    "ddp": true,
+    "jz": false,
+    "CUDA_VISIBLE_DEVICES": "0, 1, 2, 3",
+    "WORLD_SIZE": 4
+  },
+  "_monitoring": {
+    "anomaly_detection": false,
+    "empty_cache_every_n_batch": 10,
+    "check_gradients": false
+  },
+  "_data": {
+    "data_path": "./data/ShapeNetCore.v1",
+    "compute_gt_online": false,
+    "compute_partial_point_cloud_online": false,
+    "gt_surface_resolution": 1.5,
+    "gt_max_diagonal": 1.0,
+    "n_points_surface": 16384,
+    "surface_epsilon_is_constant": true,
+    "surface_epsilon": 0.00707
+  },
+  "_occupancy_model": {
+    "scone_occ_model_name": "best_unval_pretrained_scone_occ.pth",
+    "occ_no_view_harmonics": false,
+    "n_view_max_for_scone_occ": 9,
+    "max_points_per_scone_occ_pass": 300000
+  },
+  "_coverage_gain_model": {
+    "seq_len": 2048,
+    "pts_dim": 4,
+    "view_state_n_elev": 7,
+    "view_state_n_azim": 14,
+    "harmonic_degree": 8,
+    "n_proxy_points": 100000,
+    "use_occ_to_sample_proxy_points": true,
+    "min_occ_for_proxy_points": 0.1,
+    "true_monte_carlo_sampling": true
+  },
+  "_ablation": {
+    "no_view_harmonics": false,
+    "use_sigmoid": true
+  },
+  "_scone_training": {
+    "n_view_max": 9,
+    "n_view_min": 1,
+    "filter_tol": 0.01,
+    "camera_dist": 1.5,
+    "pole_cameras": true,
+    "n_camera_elev": 5,
+    "n_camera_azim": 10,
+    "n_camera": 52,
+    "prediction_in_random_camera_space": false,
+    "nbv_validation": true
+  },
+  "_general_training": {
+    "start_from_scratch": true,
+    "pretrained_weights_name": null,
+    "total_batch_size": 12,
+    "batch_size": 3,
+    "epochs": 220,
+    "learning_rate": 0.0001,
+    "schedule_learning_rate": true,
+    "lr_epochs": [
+      179
+    ],
+    "lr_factor": 0.1,
+    "warmup": 1000,
+    "warmup_rate": 99999.99999999999,
+    "noam_opt": false,
+    "training_metric": "surface_coverage_gain",
+    "training_loss": "uncentered_l1",
+    "multiply_loss": false,
+    "random_seed": 42,
+    "torch_seed": 5
+  },
+  "scone_vis_model_name": "pretrained_scone_vis"
+}
