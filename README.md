@@ -4,8 +4,8 @@
 ### 1. Clone the Repository
 
 ```bash
-git clone --recursive https://github.com/<your-username>/<your-repo>.git
-cd <your-repo>
+git clone --recursive git@github.com:shiyao-li/magician-test.git
+cd magician-test
 ```
 
 ### 2. Dataset, Environment & Model Weights
