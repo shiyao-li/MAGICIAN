@@ -543,8 +543,7 @@ def compute_pai_trajectory(params, macarons, camera, gt_scene, surface_scene,
 
     macarons.eval()
 
-    # ===== 计算场景尺度 (scene_scale) =====
-    # 使用场景边界框的三个轴的平均值作为场景尺度
+    # compute scene_scales
     scene_bbox_x = settings.scene.x_max[0] - settings.scene.x_min[0]
     scene_bbox_y = settings.scene.x_max[1] - settings.scene.x_min[1]
     scene_bbox_z = settings.scene.x_max[2] - settings.scene.x_min[2]
@@ -554,17 +553,6 @@ def compute_pai_trajectory(params, macarons, camera, gt_scene, surface_scene,
     # curriculum_distances = get_curriculum_sampling_distances(params, surface_scene, proxy_scene)
     splited_pose_space_idx = camera.generate_new_splited_dict()
     splited_pose_space = generate_key_value_splited_dict(splited_pose_space_idx)
-
-    # collision_free_list = []
-
-    # for key, values in splited_pose_space.items():
-    #     ray_origin = values.cpu().numpy()
-    #     intersections = intersector.intersects_any(ray_origins=[ray_origin], ray_directions=[np.array([0.0, 1.0, 0.0])])
-    #     if intersections[0]:
-    #         continue
-    #     collision_free_list.append(ray_origin)
-
-    # collision_free_set = set(tuple(v) for v in collision_free_list)
 
     full_pc = torch.zeros(0, 3, device=device)
     full_pc_colors = torch.zeros(0, 3, device=device)
@@ -685,72 +673,6 @@ def compute_pai_trajectory(params, macarons, camera, gt_scene, surface_scene,
         gaussian_rotations = torch.tensor([[1, 0, 0, 0]], device=device, dtype=torch.float32).repeat(n_points, 1) 
         knowledge_values = torch.zeros(n_points, device=device)  # (N,)
         gaussian_colors = update_gaussian_colors_from_knowledge(knowledge_values)  # (N, 3)
-        # if pose_i == 20:
-        #     pc_plot = plot_point_cloud(filtered_X_world, torch.tensor([[1.0, 0.0, 0.0]], device=device).repeat(filtered_X_world.shape[0], 1), name='Filtered reconstructed surface points',
-        #             point_size=2, max_points=150000, width=800, height=600, cmap='rgb')
-        #     pc_plot.show()
-        #     torch.tensor()
-        #     # ==================== Gaussian Rendering ====================
-        #     n_points = filtered_X_world.shape[0]
-        #     occ_values = occ_probs[occ_probs.squeeze() > 0.5]  # (N, 1) 
-
-        #     gaussian_means = filtered_X_world  # (N, 3) 
-        #     gaussian_opacities = occ_values   
-        #     gaussian_scales = torch.ones(n_points, 3, device=device) * (0.7154/2)  
-        #     gaussian_rotations = torch.tensor([[1, 0, 0, 0]], device=device, dtype=torch.float32).repeat(n_points, 1) 
-
-        #     knowledge_values = torch.zeros(n_points, device=device)  # (N,)
-
-        #     gaussian_colors = update_gaussian_colors_from_knowledge(knowledge_values)  # (N, 3)
-
-        #     current_X_cam = camera.X_cam_history[5]
-        #     current_V_cam = camera.V_cam_history[5]
-        #     X_cam = current_X_cam.view(1, 3)
-        #     V_cam = current_V_cam.view(1, 2)
-        #     R_cam, T_cam = get_camera_RT(X_cam, V_cam)
-        #     current_fov_camera = FoVPerspectiveCameras(R=R_cam, T=T_cam, zfar=camera.zfar, device=device)
-        #     current_fov_camera.K = current_fov_camera.get_projection_transform().get_matrix().transpose(-1, -2)
-        #     print(current_fov_camera.K)
-
-        #     rgb_images, fragments = camera.renderer(mesh, cameras=current_fov_camera)
-        #     rgb_image = rgb_images[0]  
-        #     current_depth_map = fragments.zbuf[..., 0][0]
-        #     print(current_depth_map.shape)
-        #     from ..utility.pai_utils import convert_camera_from_pytorch3d_to_gs
-        #     gs_cameras = convert_camera_from_pytorch3d_to_gs(
-        #         current_fov_camera,
-        #         height=camera.image_height,
-        #         width=camera.image_width,
-        #         device=device
-        #     )
-        #     gs_camera = gs_cameras[0] 
-
-        #     print(f"Rendering Gaussian depth for {n_points} points...")
-        #     rendered_depth, rendered_image = render_gaussian_depth(
-        #         gaussian_means=gaussian_means,
-        #         gaussian_opacities=gaussian_opacities,
-        #         gaussian_scales=gaussian_scales,
-        #         gaussian_rotations=gaussian_rotations,
-        #         gaussian_colors=gaussian_colors,
-        #         gs_camera=gs_camera,
-        #         device=device,
-        #         bg_color=torch.tensor([1.0, 1.0, 1.0], device=device),
-        #         kernel_size=0.01
-        #     )
-
-        #     print(f"Rendered depth shape: {rendered_depth.shape}")
-        #     print(f"Depth range: [{rendered_depth.min():.2f}, {rendered_depth.max():.2f}]")
-        #     print(f"Rendered image shape: {rendered_image.shape}")
-
-        #     import matplotlib.pyplot as plt
-        #     plt.imsave('pytorch3d_rgb.png', rgb_image.cpu().numpy())
-        #     vmin = min(current_depth_map.min().item(), rendered_depth.min().item())
-        #     vmax = max(current_depth_map.max().item(), rendered_depth.max().item())
-        #     plt.imsave('pytorch3d_depth.png', current_depth_map.cpu().numpy(), cmap='gray', vmin=vmin, vmax=vmax)
-        #     plt.imsave('radegx_depth.png', rendered_depth[0].cpu().numpy(), cmap='gray', vmin=vmin, vmax=vmax)
-        #     print(f"Saved depth maps with range [{vmin:.2f}, {vmax:.2f}]")
-        #     torch.tensor()
-        # ==================== End Gaussian Rendering ====================
 
         if pose_i == 0:
             sample_X_cam = camera.X_cam_history[0].view(1, 3)
@@ -807,9 +729,6 @@ def compute_pai_trajectory(params, macarons, camera, gt_scene, surface_scene,
         remaining_steps = params.n_poses_in_trajectory + 1 - history_length
         print(f"Beam search remain: {remaining_steps} steps")
 
-        # if remaining_steps <= 0:
-        #     break
-
         # initialize beam search
         initial_pose_idx = camera.cam_idx
         beams = [{
@@ -834,7 +753,6 @@ def compute_pai_trajectory(params, macarons, camera, gt_scene, surface_scene,
                 rendering_candidate = []
                 idx_candidate = []
 
-                # 获取当前beam的位置
                 current_pose, _ = camera.get_pose_from_idx(beam['current_pose_idx'])
                 X_current, _, _ = camera.get_camera_parameters_from_pose(current_pose)
                 current_loc = X_current[0].cpu().numpy()
@@ -846,24 +764,6 @@ def compute_pai_trajectory(params, macarons, camera, gt_scene, surface_scene,
 
                     if line_segment_mesh_intersection(current_loc, target_loc, intersector):
                         continue
-
-                    # print(current_loc)
-                    # print(target_loc)
-                    # torch.tensor()
-
-                    # # collision check: 检查路径是否与mesh碰撞
-                    
-                    # ray_dir = target_loc - current_loc
-                    # dist = np.linalg.norm(ray_dir)
-
-                    # if dist > 1e-6:
-                    #     ray_dir = ray_dir / dist
-                    #     locations, _, _ = intersector.intersects_location(
-                    #         ray_origins=[current_loc], ray_directions=[ray_dir]
-                    #     )
-                    #     if len(locations) > 0 and len(locations[0]) > 0:
-                    #         if np.linalg.norm(locations[0][0] - current_loc) < dist:
-                    #             continue
 
                     rendering_candidate.append(fov_neighbor)
                     idx_candidate.append(row)
@@ -912,73 +812,26 @@ def compute_pai_trajectory(params, macarons, camera, gt_scene, surface_scene,
                         rgb_image = rendered_image  # shape: [3, H, W]
                         grayscale = rgb_image.mean(dim=0)  # [H, W]
 
-                        # ===== Method 1: Simple uniform weighting (已注释) =====
-                        # white_mask = valid_depth_mask
-                        # coverage_gain = (grayscale * white_mask).sum().item()
-
-                        # ===== Method 2: Sigmoid depth weighting (已注释) =====
-                        # if valid_depth_mask.any():
-                        #     depth_min = 1
-                        #     depth_max = 502
-                        #     depth_normalized = torch.zeros_like(depth_map)
-                        #     depth_normalized[valid_depth_mask] = (depth_map[valid_depth_mask] - depth_min) / (depth_max - depth_min + 1e-6)
-                        #     depth_weight = torch.sigmoid((depth_normalized - 0.7) * 8)
-                        #     coverage_gain = (grayscale * depth_weight * valid_depth_mask.float()).sum().item()
-                        # else:
-                        #     coverage_gain = 0.0
-
-                        # ===== Method 3: Exponential falloff depth weighting (已注释) =====
-                        # epsilon = 1.0 / 2.0  # 归一化深度阈值 (低于此值会被惩罚)
-                        # weight_falloff = 8.0  # 衰减速度 (越大惩罚越强)
-                        # if valid_depth_mask.any():
-                        #     depth_normalized = torch.zeros_like(depth_map)
-                        #     depth_normalized[valid_depth_mask] = depth_map[valid_depth_mask] / scene_scale
-                        #     depth_weight = torch.exp((depth_normalized - epsilon).clamp_max(0.0) * weight_falloff)
-                        #     coverage_gain = (grayscale * depth_weight * valid_depth_mask.float()).sum().item()
-                        # else:
-                        #     coverage_gain = 0.0
-
-                        # ===== Method 4: Density-based weighting (理论驱动，当前方法) =====
-                        # 理论基础：避免采样密度超过ground truth mesh的分辨率
-                        # 深度越小 → 单位像素对应的表面积越小 → 点密度越高
-                        # 权重 = (depth / depth_threshold)^2，clamp到[0,1]
-
-                        # 超参数：选择一种方式
-                        use_target_density = False  # True: 用目标密度; False: 用深度阈值
-
-                        if use_target_density:
-                            # 方案1: 基于目标点密度（点/平方世界单位）
-                            target_density = 100.0
-                            focal_length_pixels = (gs_camera.focal_x + gs_camera.focal_y) / 2.0
-                            depth_threshold = focal_length_pixels / math.sqrt(target_density)
-                        else:
-                            # 方案2: 基于深度阈值（更直观）
-                            depth_threshold = scene_scale / 2.0  # 场景尺度的一半
+               
+                        depth_threshold = scene_scale / 2.0  
 
                         if valid_depth_mask.any():
-                            # 计算每像素观测到的点数（理论值）
-                            # nb_observed_pts ∝ (depth / depth_threshold)^2
                             nb_observed_pts_per_pixel = (depth_map / depth_threshold) ** 2
-
-                            # Clamp到[0, 1]：超过1表示密度超标，权重=1（不再奖励）
-                            # 小于1表示密度不足，权重随深度平方下降（惩罚近处）
                             depth_weight = nb_observed_pts_per_pixel.clamp_max(1.0)
 
-                            # 结合灰度和深度权重
+                            # compute coverage gain by using novelty map and depth weights map
                             coverage_gain = (grayscale * depth_weight * valid_depth_mask.float()).sum().item()
                         else:
                             coverage_gain = 0.0
 
                         new_knowledge = current_knowledge.clone()
                         new_knowledge[visible_mask] = 1.0
-                        new_score = new_knowledge.sum().item()
 
                         new_total_coverage_gain = beam['total_coverage_gain'] + coverage_gain
 
                         all_candidates.append({
                             'trajectory': beam['trajectory'] + [pose_idx],
                             'knowledge_values': new_knowledge,
-                            'score': new_score,
                             'coverage_gain': coverage_gain,  # single step
                             'total_coverage_gain': new_total_coverage_gain,  # 路径累积增益
                             'current_pose_idx': pose_idx
@@ -988,29 +841,18 @@ def compute_pai_trajectory(params, macarons, camera, gt_scene, surface_scene,
                 print("No valid candidates found!")
                 break
 
-            # old: how many gaussian balls
-            # all_candidates.sort(key=lambda x: x['score'], reverse=True)
-
-            # new: coverage gains based on rgb imgs
+            # coverage gains based on rgb imgs
             all_candidates.sort(key=lambda x: x['total_coverage_gain'], reverse=True)
             beams = all_candidates[:beam_width]
-            # print(f"Step {bs_i + 1}: Best score = {beams[0]['score']}/{n_points}, Coverage gain = {beams[0].get('coverage_gain', 0)}")  
-            print(f"Step {bs_i + 1}: Best total_coverage_gain = {beams[0]['total_coverage_gain']:.2f}, Score = {beams[0]['score']}/{n_points}, Current step gain = {beams[0].get('coverage_gain', 0):.2f}")
+            # print(f"Step {bs_i + 1}: Best total_coverage_gain = {beams[0]['total_coverage_gain']:.2f}, Score = {beams[0]['score']}/{n_points}, Current step gain = {beams[0].get('coverage_gain', 0):.2f}")
             print(f"Top {min(beam_width, len(all_candidates))} beams selected from {len(all_candidates)} candidates")
 
         if len(beams) > 0:
             best_beam = beams[0]
             best_trajectory = best_beam['trajectory']
-            final_coverage = best_beam['score']
-
-            # print(f"Best trajectory found: {best_trajectory}")
-            # print(f"Final coverage: {final_coverage}/{n_points} points")
         else:
             print("No valid trajectory found!")
             break
-
-        # t2 = time.time()
-        # print(f"Beam search time: {t2-t1:.2f}s")
 
         # move one step
         next_idx = best_trajectory[0]
@@ -1082,15 +924,6 @@ def run_pai_test(params_name,
     os.makedirs(lmdb_dir, exist_ok=True)
     print(f"\nLMDB database directory: {lmdb_dir}")
 
-    print("\nModel path:", model_name)
-    print("\nScore threshold:", params.score_threshold)
-
-    print("\nModel path:", model_name)
-    print("\nScore threshold:", params.score_threshold)
-
-    print("\nModel path:", model_name)
-    print("\nScore threshold:", params.score_threshold)
-
     for i in range(len(dataloader.dataset)):
         scene_dict = dataloader.dataset[i]
 
@@ -1137,7 +970,7 @@ def run_pai_test(params_name,
             mesh_for_check = trimesh.load(mesh_path)
 
             if isinstance(mesh_for_check, trimesh.Scene):
-                # 使用 dump 方法合并场景
+                # merge scenes
                 mesh_for_check = mesh_for_check.dump(concatenate=True)
             mesh_for_check.vertices *= params.scene_scale_factor
 
@@ -1149,9 +982,6 @@ def run_pai_test(params_name,
 
             # Use memory info to set frames and poses path
             scene_memory_path = os.path.join(scene_path, params.memory_dir_name)
-            # trajectory_nb = memory.current_epoch % memory.n_trajectories
-            # training_frames_path = memory.get_trajectory_frames_path(scene_memory_path, trajectory_nb)
-            # training_poses_path = memory.get_poses_path(scene_memory_path)
 
             torch.cuda.empty_cache()
 
@@ -1197,39 +1027,6 @@ def run_pai_test(params_name,
                                                                                       compute_collision=compute_collision)
                 
 
-                # plot_scene_and_tragectory_and_constructed_pt(scene_name=scene_name, params=params, gt_scene=gt_scene,
-                #                                             proxy_scene=proxy_scene, macarons=macarons,
-                #                                             surface_scene=surface_scene, camera=camera,
-                #                                             i_th_scene=i_scene, memory=memory,
-                #                                             device=device, results_dir=results_dir)
-                # torch.tensor()
-                # dict_to_save[scene_name][str(start_cam_idx_i)] = {}
-                # dict_to_save[scene_name][str(start_cam_idx_i)]["coverage"] = coverage_evolution
-                # # dict_to_save[scene_name][str(start_cam_idx_i)]["X_cam_history"] = X_cam_history.cpu().numpy().tolist()
-                # # dict_to_save[scene_name][str(start_cam_idx_i)]["V_cam_history"] = V_cam_history.cpu().numpy().tolist()
-
-                # with open(results_json_path, 'w') as outfile:
-                #     json.dump(dict_to_save, outfile)
-                # print("Saved data about test losses in", results_json_name)
-
-                # dict_to_save[scene_name][str(start_cam_idx_i)] = {}
-                # dict_to_save[scene_name][str(start_cam_idx_i)]["coverage"] = coverage_evolution
-                # dict_to_save[scene_name][str(start_cam_idx_i)]["X_cam_history"] = X_cam_history.cpu().numpy().tolist()
-                # dict_to_save[scene_name][str(start_cam_idx_i)]["V_cam_history"] = V_cam_history.cpu().numpy().tolist()
-
-                # # Store pc
-
-                # with open(results_json_path, 'w') as outfile:
-                #     json.dump(dict_to_save, outfile)
-                # print("Saved data about test losses in", results_json_path)
-
-                # dict_to_save = {'points': full_pc.cpu().numpy().tolist(), 'colors': full_pc_colors.cpu().numpy().tolist(), "idx": full_pc_idx.cpu().numpy().tolist()}
-                # reconstructed_json_name = os.path.join(results_dir, "my_pai" + scene_name + '.json')
-                # with open(reconstructed_json_name, 'w') as outfile:
-                #     json.dump(dict_to_save, outfile)
-
-                # torch.tensor()
-
                 # Open LMDB, save data, then close
                 print(f"\n=== Saving trajectory data to LMDB ===")
                 lmdb_env = lmdb.open(lmdb_dir, map_size=30 * 1024 * 1024 * 1024)
@@ -1241,24 +1038,16 @@ def run_pai_test(params_name,
                     'X_cam_history': X_cam_history.cpu().numpy(),
                     'V_cam_history': V_cam_history.cpu().numpy(),
                     'points': full_pc.cpu().numpy(),
+                    'points_color': full_pc_colors.cpu().numpy()
                 }
                 save_to_lmdb(lmdb_env, lmdb_key, trajectory_data)
-
-                # # Save point cloud data to LMDB (separate key for point cloud)
-                # pc_lmdb_key = f"{scene_name}/{start_cam_idx_i}/point_cloud"
-                # pc_data = {
-                #     'points': full_pc.cpu().numpy(),
-                #     'colors': full_pc_colors.cpu().numpy(),
-                #     'idx': full_pc_idx.cpu().numpy()
-                # }
-                # save_to_lmdb(lmdb_env, pc_lmdb_key, pc_data)
 
                 # Close LMDB
                 lmdb_env.close()
                 print(f"Closed LMDB database for {scene_name}/{start_cam_idx_i}\n")
 
                 # Cleanup: Keep only imgs folder, delete frames/depths/occupancy folders
-                cleanup_trajectory_folders(training_frames_path, keep_folders=['imgs'])
-                print(f"Finished processing trajectory {start_cam_idx_i}\n")
+                # cleanup_trajectory_folders(training_frames_path, keep_folders=['imgs'])
+                # print(f"Finished processing trajectory {start_cam_idx_i}\n")
 
     print("All trajectories computed.")
