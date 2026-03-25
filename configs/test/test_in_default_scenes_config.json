@@ -2,7 +2,7 @@
   "numGPU": 1,
   "dataset_path": "./data/scenes",
   "test_scenes": [
-    "stair"
+    "alhambra"
   ],
   "params_name": "macarons_default_training_config.json",
   "model_name": "trained_macarons.pth",

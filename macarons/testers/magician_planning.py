@@ -1,89 +1,13 @@
 import os
 import sys
-
 import gc
 import shutil
 from ..utility.macarons_utils import *
 from ..utility.utils import count_parameters
-from ..utility.pai_utils import CamerasWrapper
-import json
-import time
-# from ..utility.diffusion_utils import *
-
-import pickle
+from ..utility.gaussian_utils import CamerasWrapper, convert_camera_from_pytorch3d_to_gs
+from ..utility.magician_utils import *
+import trimesh
 import lmdb
-def cleanup_trajectory_folders(training_frames_path, keep_folders=['imgs']):
-    """
-    Delete all subfolders except the ones specified in keep_folders.
-    Only keeps the imgs folder and deletes frames, depths, occupancy folders.
-
-    Args:
-        training_frames_path: Path to the frames folder (e.g., .../training/0/frames/)
-        keep_folders: List of folder names to keep (default: ['imgs'])
-    """
-    # Get parent directory (e.g., .../training/0/)
-    trajectory_dir = os.path.dirname(training_frames_path)
-
-    if not os.path.exists(trajectory_dir):
-        print(f"Warning: Trajectory directory does not exist: {trajectory_dir}")
-        return
-
-    deleted_folders = []
-    kept_folders = []
-
-    print(f"\n=== Cleaning up trajectory directory: {trajectory_dir} ===")
-
-    # Iterate through all items in the trajectory directory
-    for item in os.listdir(trajectory_dir):
-        item_path = os.path.join(trajectory_dir, item)
-
-        # Only process directories
-        if os.path.isdir(item_path):
-            if item in keep_folders:
-                kept_folders.append(item)
-                print(f"  ✓ Keeping folder: {item}")
-            else:
-                # Delete the folder and all its contents
-                shutil.rmtree(item_path)
-                deleted_folders.append(item)
-                print(f"  ✗ Deleted folder: {item}")
-
-    print(f"\nCleanup summary:")
-    print(f"  - Kept: {kept_folders}")
-    print(f"  - Deleted: {deleted_folders}\n")
-
-def save_to_lmdb(lmdb_env, key, data_dict):
-    """
-    Save data to LMDB database.
-
-    Args:
-        lmdb_env: LMDB environment
-        key: string key (e.g., "scene_name/start_cam_idx")
-        data_dict: dictionary containing the data to save
-    """
-    with lmdb_env.begin(write=True) as txn:
-        # Serialize data using pickle
-        serialized_data = pickle.dumps(data_dict)
-        txn.put(key.encode('utf-8'), serialized_data)
-    print(f"Saved data to LMDB with key: {key}")
-
-def load_from_lmdb(lmdb_env, key):
-    """
-    Load data from LMDB database.
-
-    Args:
-        lmdb_env: LMDB environment
-        key: string key (e.g., "scene_name/start_cam_idx")
-
-    Returns:
-        data_dict: deserialized dictionary
-    """
-    with lmdb_env.begin() as txn:
-        serialized_data = txn.get(key.encode('utf-8'))
-        if serialized_data is None:
-            return None
-        return pickle.loads(serialized_data)
-
 
 # ==================== RaDe-GS Integration ====================
 RADE_GS_PATH = os.path.join(os.path.dirname(__file__), "../../RaDe-GS")
@@ -229,16 +153,16 @@ def render_gaussian_depth(gaussian_means, gaussian_opacities, gaussian_scales,
     return rendered_median_depth, rendered_image
 
 
-def update_gaussian_colors_from_knowledge(knowledge_values):
+def update_gaussian_colors_from_novelty(novelty_values):
     """
-    use knowledge_values update Gaussian colors
+    use novelty_values update Gaussian colors
 
     Args:
-        knowledge_values: 
+        novelty_values: 
             0 = unknown → white [1,1,1]
             1 = known → black [0,0,0]
     """
-    inverted_values = 1.0 - knowledge_values
+    inverted_values = 1.0 - novelty_values
     colors = inverted_values.unsqueeze(1).repeat(1, 3)
     return colors
 
@@ -277,20 +201,6 @@ def apply_perfect_depth_simple(frame_data, device, use_error_mask=True):
     
     return depth, mask, error_mask, R, T
 
-
-def clear_folder(folder_path):
-    """
-    remove all for a folder
-    """
-    if os.path.exists(folder_path):
-        for item in os.listdir(folder_path):
-            item_path = os.path.join(folder_path, item)
-            if os.path.isfile(item_path):
-                os.remove(item_path)
-            elif os.path.isdir(item_path):
-                shutil.rmtree(item_path)
-        print(f" {folder_path} is clear")
-
 dir_path = os.path.abspath(os.path.dirname(__file__))
 # data_path = os.path.join(dir_path, "../../../../../../datasets/rgb")
 data_path = os.path.join(dir_path, "../../data/scenes")
@@ -327,18 +237,6 @@ def setup_test(params, model_path, device, verbose=True):
     print("It has been trained for", trained_weights["epoch"], "epochs.")
     print("The loss was:", depth_losses_per_epoch[-1], depth_losses_per_epoch[-1] * 3 / 4)
     print(params.n_alpha, "additional frames are used for depth prediction.")
-
-    # Set loss functions
-    pose_loss_fn = get_pose_loss_fn(params)
-    regularity_loss_fn = get_regularity_loss_fn(params)
-    ssim_loss_fn = None
-    if params.training_mode == 'self_supervised':
-        depth_loss_fn = get_reconstruction_loss_fn(params)
-        ssim_loss_fn = get_ssim_loss_fn(params)
-    else:
-        raise NameError("Invalid training mode.")
-    occ_loss_fn = get_occ_loss_fn(params)
-    cov_loss_fn = get_cov_loss_fn(params)
 
     # Creating memory
     print("\nUsing memory folders", params.memory_dir_name)
@@ -499,25 +397,6 @@ def setup_test_camera(params,
                     mirrored_scene=mirrored_scene,
                     mirrored_axis=mirrored_axis)  # Change or remove this path during inference or test
 
-    # Move to a valid neighbor pose before starting training.
-    # Thus, we will have a few images to start training the depth module
-    start_pose, _ = camera.get_pose_from_idx(start_cam_idx)
-    # X_neighbor, V_neighbor, fov_neighbor = camera.get_camera_parameters_from_pose(start_pose)
-    # current_origin = X_neighbor[0].cpu().numpy()
-
-    # neighbor_indices = camera.get_neighboring_poses(pose_idx=start_cam_idx)
-    # valid_neighbors = camera.get_valid_neighbors(neighbor_indices=neighbor_indices, mesh=mesh)
-    # # first_cam_idx = valid_neighbors[np.random.randint(low=0, high=len(valid_neighbors))]
-    # for neighbor_i in range(len(valid_neighbors)):
-    #     neighbor_idx = valid_neighbors[neighbor_i]
-    #     neighbor_pose, _ = camera.get_pose_from_idx(neighbor_idx)
-    #     X_neighbor, V_neighbor, fov_neighbor = camera.get_camera_parameters_from_pose(neighbor_pose)
-    #     ray_origin = X_neighbor[0].cpu().numpy()
-
-    #     if not line_segment_mesh_intersection(current_origin, ray_origin, intersector):
-    #         first_cam_idx = neighbor_idx
-    #         break
-        
 
     # Select a random, valid camera pose as starting pose
     camera.initialize_camera(start_cam_idx=start_cam_idx)
@@ -525,18 +404,10 @@ def setup_test_camera(params,
     # Capture initial image
     camera.capture_image(mesh)
 
-    # We capture images along the way
-    # interpolation_step = 1
-    # for i in range(camera.n_interpolation_steps):
-    #     camera.update_camera(start_cam_idx, interpolation_step=interpolation_step)
-    #     camera.capture_image(mesh)
-    #     interpolation_step += 1
-
     return camera
 
-from macarons.utility.tsp_utils import generate_key_value_splited_dict, line_segment_mesh_intersection
 
-def compute_pai_trajectory(params, macarons, camera, gt_scene, surface_scene,
+def compute_magician_trajectory(params, macarons, camera, gt_scene, surface_scene,
                            proxy_scene, covered_scene, mesh, intersector, device, settings,
                            test_resolution=0.05, use_perfect_depth_map=False,
                            compute_collision=False):
@@ -550,17 +421,12 @@ def compute_pai_trajectory(params, macarons, camera, gt_scene, surface_scene,
     scene_scale = (scene_bbox_x + scene_bbox_y + scene_bbox_z) / 3.0
     print(f"Scene scale computed: {scene_scale:.2f} (bbox: x={scene_bbox_x:.2f}, y={scene_bbox_y:.2f}, z={scene_bbox_z:.2f})")
 
-    # curriculum_distances = get_curriculum_sampling_distances(params, surface_scene, proxy_scene)
-    splited_pose_space_idx = camera.generate_new_splited_dict()
-    splited_pose_space = generate_key_value_splited_dict(splited_pose_space_idx)
-
     full_pc = torch.zeros(0, 3, device=device)
     full_pc_colors = torch.zeros(0, 3, device=device)
     full_pc_idx = torch.zeros(0, 1, device=device)
     coverage_evolution = []
-    t0 = time.time()
     pose_i = 0
-
+    
     def process_current_frame():
         current_frame = load_current_frame_perfect_depth(camera, device)
         depth, mask, error_mask, R, T = apply_perfect_depth_simple(current_frame, device)
@@ -614,7 +480,7 @@ def compute_pai_trajectory(params, macarons, camera, gt_scene, surface_scene,
 
         frame_data = process_current_frame()
 
-        # unpdate scene
+        # Unpdate scene
         part_pc_features = torch.zeros(len(frame_data['part_pc']), 1, device=device)
         covered_scene.fill_cells(frame_data['part_pc'], features=part_pc_features)
         surface_scene.fill_cells(frame_data['part_pc'], features=part_pc_features)
@@ -643,7 +509,7 @@ def compute_pai_trajectory(params, macarons, camera, gt_scene, surface_scene,
 
         surface_scene.set_all_features_to_value(value=1.)
 
-        # compute coverage gain
+        # Compute coverage gain for evaulation
         current_coverage = gt_scene.scene_coverage(
             covered_scene, surface_epsilon=2 * test_resolution * params.scene_scale_factor
         )
@@ -652,27 +518,23 @@ def compute_pai_trajectory(params, macarons, camera, gt_scene, surface_scene,
         current_cov = current_coverage[0].item() if current_coverage[0] != 0. else 0.
         coverage_evolution.append(current_cov / settings.scene.visibility_ratio)
 
-        # if pose_i >= params.n_poses_in_trajectory:
-        #     break
-
+        # Occupancy field prediction
         with torch.no_grad():
             X_world, view_harmonics, occ_probs = compute_scene_occupancy_probability_field(
                 params, macarons.scone, camera, surface_scene, proxy_scene, device
             )
+        # We only keep the points with occupancy value larger than 0.5
         filtered_X_world = X_world[occ_probs.squeeze() > 0.5]
-        # pc_plot = plot_point_cloud(filtered_X_world, torch.tensor([[1.0, 0.0, 0.0]], device=device).repeat(filtered_X_world.shape[0], 1), name='Filtered reconstructed surface points',
-        #             point_size=2, max_points=150000, width=800, height=600, cmap='rgb')
-        # pc_plot.show()
-        print(filtered_X_world.shape)
         n_points = filtered_X_world.shape[0]
-        from ..utility.pai_utils import convert_camera_from_pytorch3d_to_gs
         gaussian_means = filtered_X_world  # (N, 3) 
         occ_values = occ_probs[occ_probs.squeeze() >= 0.5] 
+
+        # Convert occupancy field to Imagined Gaussians
         gaussian_opacities = occ_values    # (N, 1) 
         gaussian_scales = torch.ones(n_points, 3, device=device) * (0.7154/2)  
         gaussian_rotations = torch.tensor([[1, 0, 0, 0]], device=device, dtype=torch.float32).repeat(n_points, 1) 
-        knowledge_values = torch.zeros(n_points, device=device)  # (N,)
-        gaussian_colors = update_gaussian_colors_from_knowledge(knowledge_values)  # (N, 3)
+        novelty_values = torch.zeros(n_points, device=device)  # (N,)
+        gaussian_colors = update_gaussian_colors_from_novelty(novelty_values)  # (N, 3)
 
         if pose_i == 0:
             sample_X_cam = camera.X_cam_history[0].view(1, 3)
@@ -681,8 +543,8 @@ def compute_pai_trajectory(params, macarons, camera, gt_scene, surface_scene,
             sample_camera = FoVPerspectiveCameras(R=R_sample, T=T_sample, zfar=camera.zfar, device=device)
             K_matrix = sample_camera.get_projection_transform().get_matrix().transpose(-1, -2)
 
-        # 1. initialize all knowledge_values to 0
-        knowledge_values = torch.zeros(n_points, device=device)
+        # 1. initialize all novelty_values to 0
+        novelty_values = torch.zeros(n_points, device=device)
 
         # 2. revisit all previous cameras
         history_length = len(camera.X_cam_history)
@@ -721,9 +583,10 @@ def compute_pai_trajectory(params, macarons, camera, gt_scene, surface_scene,
                 current_visible_mask = camera.check_point_visibility_from_depth(
                     filtered_X_world, current_fov_camera, current_depth_map, depth_tolerance=1.0
                 )
-                knowledge_values[current_visible_mask] = 1.0
+                # update the novelty along the visited cameras
+                novelty_values[current_visible_mask] = 1.0
 
-        print(f"historical: {knowledge_values.sum().item()}/{n_points}")
+        print(f"historical: {novelty_values.sum().item()}/{n_points}")
 
         # 3. Beam Search 
         remaining_steps = params.n_poses_in_trajectory + 1 - history_length
@@ -733,11 +596,13 @@ def compute_pai_trajectory(params, macarons, camera, gt_scene, surface_scene,
         initial_pose_idx = camera.cam_idx
         beams = [{
             'trajectory': [],
-            'knowledge_values': knowledge_values.clone(),
-            'score': knowledge_values.sum().item(),
+            'novelty_values': novelty_values.clone(),
+            'score': novelty_values.sum().item(),
             'total_coverage_gain': 0.0,  
             'current_pose_idx': initial_pose_idx
         }]
+
+        # settings for beam search
         beam_width = 10
         remaining_steps = 10
         for bs_i in range(remaining_steps):
@@ -762,8 +627,13 @@ def compute_pai_trajectory(params, macarons, camera, gt_scene, surface_scene,
                     X_neighbor, V_neighbor, fov_neighbor = camera.get_camera_parameters_from_pose(neighbor_pose)
                     target_loc = X_neighbor[0].cpu().numpy()
 
-                    if line_segment_mesh_intersection(current_loc, target_loc, intersector):
-                        continue
+                    if bs_i == 0:
+                        if line_segment_mesh_intersection(current_loc, target_loc, intersector):
+                            continue
+                    else:
+                        # we use occupancy points to check for future collisions.
+                        if line_segment_intersects_point_cloud_region(filtered_X_world, X_current[0], X_neighbor[0]):
+                            continue
 
                     rendering_candidate.append(fov_neighbor)
                     idx_candidate.append(row)
@@ -785,8 +655,8 @@ def compute_pai_trajectory(params, macarons, camera, gt_scene, surface_scene,
                     gs_camera = gs_cameras[0]
 
                     # update colors
-                    current_knowledge = beam['knowledge_values']
-                    gaussian_colors = update_gaussian_colors_from_knowledge(current_knowledge)
+                    current_novelty= beam['novelty_values']
+                    gaussian_colors = update_gaussian_colors_from_novelty(current_novelty)
 
                     with torch.no_grad():
                         rendered_depth, rendered_image = render_gaussian_depth(
@@ -807,7 +677,7 @@ def compute_pai_trajectory(params, macarons, camera, gt_scene, surface_scene,
                             filtered_X_world, fov_camera, depth_map, depth_tolerance=1.0
                         )
 
-                        # white pixels: unseen points（knowledge_values=0）
+                        # white pixels: unseen points（novelty_values=0）
                         valid_depth_mask = depth_map > 0
                         rgb_image = rendered_image  # shape: [3, H, W]
                         grayscale = rgb_image.mean(dim=0)  # [H, W]
@@ -824,16 +694,16 @@ def compute_pai_trajectory(params, macarons, camera, gt_scene, surface_scene,
                         else:
                             coverage_gain = 0.0
 
-                        new_knowledge = current_knowledge.clone()
-                        new_knowledge[visible_mask] = 1.0
+                        new_novelty = current_novelty.clone()
+                        new_novelty[visible_mask] = 1.0
 
                         new_total_coverage_gain = beam['total_coverage_gain'] + coverage_gain
 
                         all_candidates.append({
                             'trajectory': beam['trajectory'] + [pose_idx],
-                            'knowledge_values': new_knowledge,
+                            'novelty_values': new_novelty,
                             'coverage_gain': coverage_gain,  # single step
-                            'total_coverage_gain': new_total_coverage_gain,  # 路径累积增益
+                            'total_coverage_gain': new_total_coverage_gain, 
                             'current_pose_idx': pose_idx
                         })
 
@@ -866,16 +736,11 @@ def compute_pai_trajectory(params, macarons, camera, gt_scene, surface_scene,
 
         pose_i += 1
 
-    # pc_plot = plot_point_cloud(full_pc, torch.tensor([[1.0, 0.0, 0.0]], device=device).repeat(full_pc.shape[0], 1), name='Filtered reconstructed surface points', 
-    #                 point_size=2, max_points=150000, width=800, height=600, cmap='rgb')
-    # pc_plot.show()
-
-    print("Trajectory computed in", time.time() - t0, "seconds.")
     print("Coverage Evolution:", coverage_evolution)
     
     return coverage_evolution, camera.X_cam_history, camera.V_cam_history, full_pc, full_pc_colors, full_pc_idx
         
-def run_pai_test(params_name,
+def run_magician_test(params_name,
              model_name,
              results_json_name,
              numGPU,
@@ -914,12 +779,6 @@ def run_pai_test(params_name,
     # Setup model and dataloader
     dataloader, macarons, memory = setup_test(params, weights_path, device)
 
-    # Result json
-    # if load_json:
-    #     with open(results_json_path, "r") as read_content:
-    #         dict_to_save = json.load(read_content)
-    # else:
-    #     dict_to_save = {}
     lmdb_dir = os.path.join(results_dir, "ours_lmdb")
     os.makedirs(lmdb_dir, exist_ok=True)
     print(f"\nLMDB database directory: {lmdb_dir}")
@@ -946,8 +805,6 @@ def run_pai_test(params_name,
             print("\nScene name:", scene_name)
             print("-------------------------------------")
 
-            # dict_to_save[scene_name] = {}
-
             scene_path = os.path.join(dataloader.dataset.data_path, scene_name)
             mesh_path = os.path.join(scene_path, obj_name)
             # segmented_mesh_path = os.path.join(scene_path, 'segmented.obj')
@@ -955,22 +812,13 @@ def run_pai_test(params_name,
             mirrored_scene = False
             mirrored_axis = None
 
-            # Load segmented mesh
-            # mesh = load_scene(segmented_mesh_path, params.scene_scale_factor, device, mirror=mirrored_scene)
-            # gt_scene, _, _, _ = setup_test_scene(params,
-            #                                      mesh,
-            #                                      settings,
-            #                                      mirrored_scene,
-            #                                      device)
-
             # Load mesh
             mesh = load_scene(mesh_path, params.scene_scale_factor, device,
                               mirror=mirrored_scene, mirrored_axis=mirrored_axis)
-            import trimesh
+           
             mesh_for_check = trimesh.load(mesh_path)
 
             if isinstance(mesh_for_check, trimesh.Scene):
-                # merge scenes
                 mesh_for_check = mesh_for_check.dump(concatenate=True)
             mesh_for_check.vertices *= params.scene_scale_factor
 
@@ -1014,7 +862,7 @@ def run_pai_test(params_name,
                                            mirrored_scene=mirrored_scene, mirrored_axis=mirrored_axis)
                 print(camera.X_cam_history[0], camera.V_cam_history[0])
 
-                coverage_evolution, X_cam_history, V_cam_history, full_pc, full_pc_colors, full_pc_idx = compute_pai_trajectory(params, macarons,
+                coverage_evolution, X_cam_history, V_cam_history, full_pc, full_pc_colors, full_pc_idx = compute_magician_trajectory(params, macarons,
                                                                                       camera,
                                                                                       gt_scene, surface_scene,
                                                                                       proxy_scene, covered_scene,

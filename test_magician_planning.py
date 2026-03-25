@@ -1,5 +1,5 @@
 import argparse
-from macarons.testers.pai_planning import *
+from macarons.testers.magician_planning import *
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
 test_configs_dir = os.path.join(dir_path, "./configs/test/")
@@ -23,7 +23,7 @@ if __name__ == '__main__':
 
 
     with torch.no_grad():
-        run_pai_test(params_name=test_params.params_name,
+        run_magician_test(params_name=test_params.params_name,
                  model_name=test_params.model_name,
                  results_json_name=test_params.results_json_name,
                  numGPU=test_params.numGPU,

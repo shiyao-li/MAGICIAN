@@ -1,10 +1,5 @@
 import os
-import heapq
 import torch
-import torchvision
-import time 
-
-import json
 
 from torch.utils.data import DataLoader
 import torch.distributed as dist
@@ -28,6 +23,11 @@ from pytorch3d.renderer.mesh.renderer import MeshRendererWithFragments
 
 from torchvision.transforms.functional import adjust_contrast
 import torch.multiprocessing as mp
+from pytorch3d.io import load_objs_as_meshes
+from pytorch3d.io import load_obj
+from pytorch3d.structures import Meshes
+from pytorch3d.renderer.mesh.textures import TexturesAtlas
+
 
 from .utils import (
     Params,
@@ -432,77 +432,9 @@ def initialize_macarons(params, macarons, device,
 # Functions for Scene Management
 # ======================================================================================================================
 
-# def load_scene(mesh_path, scene_scale_factor, device, mirror=False, mirrored_axis=None):
-#     """
-#     Loads a 3D scene as a mesh and scales the vertices.
-
-#     :param mesh_path: (str)
-#     :param scene_scale_factor: (float)
-#     :param device:
-#     :param mirror: (bool) If True, mirrors the coordinates on x-axis.
-#     :return:
-#     """
-#     mesh = load_objs_as_meshes([mesh_path], device=device)
-#     mesh.verts_list()[0] *= scene_scale_factor
-#     if mirror:
-#         if mirrored_axis is None:
-#             raise NameError("Please provide the list of mirrored axis.")
-#         else:
-#             for axis in mirrored_axis:
-#                 mesh.verts_list()[0][..., axis] = -mesh.verts_list()[0][..., axis]
-#     return mesh
-
-from pytorch3d.io import load_objs_as_meshes
-
-from pytorch3d.io import load_obj
-from pytorch3d.structures import Meshes
-from pytorch3d.renderer.mesh.textures import TexturesAtlas
-
-# def load_scene(mesh_path, scene_scale_factor, device, mirror=False, mirrored_axis=None):
-#     """
-#     正确加载多纹理场景的方法
-#     """
-#     # 使用 load_obj 而不是 load_objs_as_meshes
-#     verts, faces, aux = load_obj(
-#         mesh_path,
-#         device=device,
-#         load_textures=True,
-#         create_texture_atlas=True,
-#         texture_atlas_size=32,  # 可以尝试 4, 8, 16
-#         texture_wrap="repeat",  # 或 "clamp"，取决于你的模型
-#     )
-    
-#     # 缩放顶点
-#     verts = verts * scene_scale_factor
-    
-#     # 镜像处理
-#     if mirror:
-#         if mirrored_axis is None:
-#             raise NameError("Please provide the list of mirrored axis.")
-#         else:
-#             for axis in mirrored_axis:
-#                 verts[..., axis] = -verts[..., axis]
-    
-#     # 获取纹理图集
-#     atlas = aux.texture_atlas
-    
-#     # 手动构建 Mesh（这是关键！）
-#     mesh = Meshes(
-#         verts=[verts],
-#         faces=[faces.verts_idx],  # 注意是 faces.verts_idx，不是 faces
-#         textures=TexturesAtlas(atlas=[atlas]),  # 使用 TexturesAtlas
-#     )
-    
-#     return mesh
-from pytorch3d.structures import Meshes
-from pytorch3d.renderer.mesh.textures import TexturesAtlas
-
 def count_map_kd(mesh_path):
-    """统计MTL中的map_Kd数量"""
     obj_dir = os.path.dirname(mesh_path) or '.'
     textures = set()
-    
-    # 读取OBJ找MTL
     with open(mesh_path, 'r') as f:
         for line in f:
             if line.startswith('mtllib '):
@@ -522,11 +454,9 @@ def count_map_kd(mesh_path):
 def load_scene(mesh_path, scene_scale_factor, device, 
                mirror=False, mirrored_axis=None,
                texture_wrap="repeat", texture_atlas_size=32):
-    """场景加载器：根据纹理数量自动选择方法"""
     
     num_tex = count_map_kd(mesh_path)
     
-    # 单纹理或无纹理 → 简单方法
     if num_tex <= 1:
         mesh = load_objs_as_meshes([mesh_path], device=device)
         mesh.verts_list()[0] *= scene_scale_factor
@@ -537,7 +467,6 @@ def load_scene(mesh_path, scene_scale_factor, device,
         
         return mesh
     
-    # 多纹理 → 高级方法
     verts, faces, aux = load_obj(
         mesh_path, device=device, load_textures=True,
         create_texture_atlas=True,

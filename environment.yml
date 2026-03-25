@@ -1,4 +1,4 @@
-name: pai
+name: magician
 channels:
   - conda-forge
   - defaults
@@ -150,6 +150,7 @@ dependencies:
     - prompt-toolkit==3.0.52
     - ptyprocess==0.7.0
     - pure-eval==0.2.3
+    - pycolmap==0.6.0
     - pyembree==0.1.12
     - pygments==2.19.2
     - pyparsing==3.2.5
