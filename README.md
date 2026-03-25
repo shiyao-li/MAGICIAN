@@ -8,6 +8,9 @@
 </a>
 <a href="https://shiyao-li.github.io/magician/"><img src="https://img.shields.io/badge/Project_Page-green" alt="Project Page"></a>
 
+<br>
+<img src="assets/image.png" alt="Teaser" width="100%">
+
 </div>
 
 ## Getting Started
