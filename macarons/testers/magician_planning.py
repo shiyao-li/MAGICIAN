@@ -524,11 +524,10 @@ def compute_magician_trajectory(params, macarons, camera, gt_scene, surface_scen
                 params, macarons.scone, camera, surface_scene, proxy_scene, device
             )
         # We only keep the points with occupancy value larger than 0.5
-        filtered_X_world_check = X_world[occ_probs.squeeze() > 0.5]
-        filtered_X_world = X_world[occ_probs.squeeze() >= 0.5]
+        filtered_X_world = X_world[occ_probs.squeeze() > 0.5]
         n_points = filtered_X_world.shape[0]
         gaussian_means = filtered_X_world  # (N, 3) 
-        occ_values = occ_probs[occ_probs.squeeze() >= 0.5] 
+        occ_values = occ_probs[occ_probs.squeeze() > 0.5] 
 
         # Convert occupancy field to Imagined Gaussians
         gaussian_opacities = occ_values    # (N, 1) 
@@ -633,7 +632,7 @@ def compute_magician_trajectory(params, macarons, camera, gt_scene, surface_scen
                             continue
                     else:
                         # we use occupancy points to check for future collisions.
-                        if line_segment_intersects_point_cloud_region(filtered_X_world_check, X_current[0], X_neighbor[0]):
+                        if line_segment_intersects_point_cloud_region(filtered_X_world, X_current[0], X_neighbor[0]):
                             continue
 
                     rendering_candidate.append(fov_neighbor)
