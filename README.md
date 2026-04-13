@@ -41,7 +41,7 @@ pip install submodules/tetra_triangulation/ --no-build-isolation
 
 ### 3. Dataset
 
-Download the dataset [here](https://huggingface.co/datasets/sli016/scenes/resolve/main/macarons%2B%2B.zip) and place it under a `data/` folder in the project root.
+Download the dataset [here](https://huggingface.co/datasets/sli016/Macarons-plus-plus/tree/main) and place it under a `data/` folder in the project root.
 
 ### 4. Pretrained Weights
 
