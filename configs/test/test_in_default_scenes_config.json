@@ -26,5 +26,8 @@
   "compute_collision": false,
   "load_json": false,
   "random_seed": 8,
-  "torch_seed": 9
+  "torch_seed": 9,
+  "lmdb_dir_name": "magician_lmdb",
+  "beam_width": 10,
+  "beam_steps": 10
 }

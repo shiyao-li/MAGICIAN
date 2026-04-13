@@ -603,10 +603,9 @@ def compute_magician_trajectory(params, macarons, camera, gt_scene, surface_scen
         }]
 
         # settings for beam search
-        beam_width = 10
-        remaining_steps = 10
-        for bs_i in range(remaining_steps):
-            print(f"Beam search step {bs_i + 1}/{remaining_steps}")
+        beam_width = params.beam_width
+        for bs_i in range(params.beam_steps):
+            print(f"Beam search step {bs_i + 1}/{params.beam_steps}")
 
             all_candidates = []
 
@@ -749,7 +748,8 @@ def run_magician_test(params_name,
              use_perfect_depth_map=False,
              compute_collision=False,
              load_json=False,
-             dataset_path=None):
+             dataset_path=None,
+             test_params=None):
 
     params_path = os.path.join(configs_dir, params_name)
     weights_path = os.path.join(weights_dir, model_name)
@@ -779,7 +779,10 @@ def run_magician_test(params_name,
     # Setup model and dataloader
     dataloader, macarons, memory = setup_test(params, weights_path, device)
 
-    lmdb_dir = os.path.join(results_dir, "ours_lmdb")
+    params.beam_width = test_params.beam_width
+    params.beam_steps = test_params.beam_steps
+
+    lmdb_dir = os.path.join(results_dir, test_params.lmdb_dir_name)
     os.makedirs(lmdb_dir, exist_ok=True)
     print(f"\nLMDB database directory: {lmdb_dir}")
 

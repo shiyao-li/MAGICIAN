@@ -32,5 +32,6 @@ if __name__ == '__main__':
                  use_perfect_depth_map=test_params.use_perfect_depth_map,
                  compute_collision=test_params.compute_collision,
                  load_json=test_params.load_json,
-                 dataset_path=test_params.dataset_path)
+                 dataset_path=test_params.dataset_path,
+                 test_params=test_params)
 
