@@ -25,18 +25,25 @@ cd MAGICIAN
 ### 2. Environment Setup
 
 ```bash
+
 conda env create -f environment.yml
 conda activate magician
+# install pytorch-3d
+pip install "git+https://github.com/facebookresearch/pytorch3d.git"
+
 cd RaDe-GS
 pip install -r requirements.txt
 pip install submodules/diff-gaussian-rasterization --no-build-isolation
-pip install submodules/warp-patch-ncc --no-build-isolation
 pip install submodules/simple-knn/ --no-build-isolation
-pip install git+https://github.com/rahul-goel/fused-ssim/ --no-build-isolation
 
 # tetra-nerf for Marching Tetrahedra
-conda install conda-forge::cgal
-pip install submodules/tetra_triangulation/ --no-build-isolation
+cd submodules/tetra_triangulation
+cmake .
+# you can specify your own cuda path
+# export CPATH=/usr/local/cuda/include:$CPATH
+make 
+pip install -e .
+cd ../../..
 ```
 
 ### 3. Dataset
