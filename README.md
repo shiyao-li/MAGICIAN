@@ -117,7 +117,7 @@ Go to **File > Export > Wavefront (.obj)** and follow the steps shown below:
 
 This produces a `.obj` file, a `.mtl` file, and any associated texture files. The `.obj` and `.mtl` files must share the same base name.
 
-### Step 6 — Configure `settings.json` and add the scene to the dataset
+### Step 5 — Configure `settings.json` and add the scene to the dataset
 
 1. Create a new directory for your scene under `./data/Macarons++/`, e.g. `./data/Macarons++/power_facility/`.
 2. Move the `.obj`, `.mtl`, and texture files into that directory.
