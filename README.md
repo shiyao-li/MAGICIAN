@@ -107,13 +107,7 @@ In Blender, scale, rotate, and/or translate your scene so that its bounding box 
 
 <img src="assets/align.png" alt="Aligning the scene scale in Blender" width="70%">
 
-### Step 4 — Select the scene and configure export settings
-
-Select your scene object and review the settings before exporting:
-
-<img src="assets/settings.png" alt="Scene selection and export settings" width="70%">
-
-### Step 5 — Export as `.obj`
+### Step 4 — Export as `.obj`
 
 Go to **File > Export > Wavefront (.obj)** and follow the steps shown below:
 
