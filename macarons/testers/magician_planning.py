@@ -349,7 +349,6 @@ def setup_test_scene(params,
 def setup_test_camera(params,
                       mesh, intersector, start_cam_idx,
                       settings,
-                      occupied_pose_data,
                       device,
                       training_frames_path,
                       mirrored_scene=False,
@@ -361,7 +360,6 @@ def setup_test_camera(params,
     :param mesh:
     :param start_cam_idx:
     :param settings:
-    :param occupied_pose_data:
     :param device:
     :param training_frames_path:
     :return:
@@ -392,7 +390,6 @@ def setup_test_camera(params,
                     device=device,
                     contrast_factor=settings.camera.contrast_factor,
                     gathering_factor=params.gathering_factor,
-                    occupied_pose_data=occupied_pose_data,
                     save_dir_path=training_frames_path,
                     mirrored_scene=mirrored_scene,
                     mirrored_axis=mirrored_axis)  # Change or remove this path during inference or test
@@ -792,7 +789,6 @@ def run_magician_test(params_name,
         scene_names = [scene_dict['scene_name']]
         obj_names = [scene_dict['obj_name']]
         all_settings = [scene_dict['settings']]
-        occupied_pose_datas = [scene_dict['occupied_pose']]
 
         batch_size = len(scene_names)
 
@@ -804,7 +800,6 @@ def run_magician_test(params_name,
             obj_name = obj_names[i_scene]
             settings = all_settings[i_scene]
             settings = Settings(settings, device, params.scene_scale_factor)
-            occupied_pose_data = occupied_pose_datas[i_scene]
             print("\nScene name:", scene_name)
             print("-------------------------------------")
 
@@ -860,7 +855,7 @@ def run_magician_test(params_name,
                                                                                        test_resolution=test_resolution)
 
                 # clear_folder(training_frames_path)
-                camera = setup_test_camera(params, mesh, intersector, start_cam_idx, settings, occupied_pose_data,
+                camera = setup_test_camera(params, mesh, intersector, start_cam_idx, settings,
                                            device, training_frames_path,
                                            mirrored_scene=mirrored_scene, mirrored_axis=mirrored_axis)
                 print(camera.X_cam_history[0], camera.V_cam_history[0])

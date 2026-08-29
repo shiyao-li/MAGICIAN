@@ -174,8 +174,7 @@ def get_dataloader(train_scenes, val_scenes, test_scenes,
                    batch_size,
                    ddp=False, jz=False,
                    world_size=None, ddp_rank=None,
-                   data_path=None,
-                   use_occupied_pose=True):
+                   data_path=None):
     # Database path
     if data_path is None:
         if jz:
@@ -186,9 +185,9 @@ def get_dataloader(train_scenes, val_scenes, test_scenes,
         database_path = data_path
 
     # Dataset
-    train_dataset = SceneDataset(data_path=database_path, scene_names=train_scenes, use_occupied_pose=use_occupied_pose)
-    val_dataset = SceneDataset(data_path=database_path, scene_names=val_scenes, use_occupied_pose=use_occupied_pose)
-    test_dataset = SceneDataset(data_path=database_path, scene_names=test_scenes, use_occupied_pose=use_occupied_pose)
+    train_dataset = SceneDataset(data_path=database_path, scene_names=train_scenes)
+    val_dataset = SceneDataset(data_path=database_path, scene_names=val_scenes)
+    test_dataset = SceneDataset(data_path=database_path, scene_names=test_scenes)
 
     if ddp or jz:
         if jz:
@@ -479,7 +478,7 @@ def load_scene(mesh_path, scene_scale_factor, device,
     if mirror:
         for axis in mirrored_axis:
             verts[..., axis] = -verts[..., axis]
-    torch.tensor()
+    # torch.tensor()
     
     return Meshes(
         verts=[verts],
@@ -2025,7 +2024,6 @@ class Camera:
                  zfar, renderer, device,
                  contrast_factor=1.,
                  gathering_factor=0.05,
-                 occupied_pose_data=None,
                  save_dir_path=None,
                  mirrored_scene=False,
                  mirrored_axis=None):
@@ -2047,7 +2045,6 @@ class Camera:
         :param contrast_factor: (float) Value to adjust output image contrast.
             contrast_factor=1. does not change the result.
         :param gathering_factor: (float) Proportion of points to gather by the sensor in the depth map.
-        :param occupied_pose_data: (Dict) Dictionary containing info about occupied poses.
         """
 
         # ----------Pose settings---------------------------------------------------------------------------------------
@@ -2160,36 +2157,6 @@ class Camera:
             self.pose_space[str(pose_idx.numpy().tolist())] = pose
             self.pose_history[str(pose_idx.numpy().tolist())] = False
 
-        self.use_occupied_pose = False
-        if occupied_pose_data is not None:
-            self.use_occupied_pose = True
-            pose_is_occupied = {}
-            for i in range(len(occupied_pose_data['X_idx'])):
-                is_occupied = occupied_pose_data['occupied'][i]
-
-                X_idx = 0. + occupied_pose_data['X_idx'][i]
-                if mirrored_scene:
-                    if mirrored_axis is None:
-                        raise NameError("Please provide the list of mirrored axis.")
-                    else:
-                        for axis in mirrored_axis:
-                            if axis == 0:
-                                bound = self.pose_l - 1
-                            elif axis == 1:
-                                bound = self.pose_w - 1
-                            elif axis == 2:
-                                bound = self.pose_h - 1
-                            else:
-                                raise NameError("Wrong value for axis to be mirrored. "
-                                                "Please choose an integer in [0, 1, 2].")
-                            X_idx[..., axis] = bound - X_idx[..., axis]
-
-                X_key = str(X_idx.long().cpu().numpy().tolist())
-
-                pose_is_occupied[X_key] = is_occupied.item()
-
-            self.pose_is_occupied = pose_is_occupied
-
     def initialize_camera(self, start_cam_idx):
         """
         Initialize a camera with a start index.
@@ -2204,7 +2171,7 @@ class Camera:
     def get_random_valid_pose(self, mesh, proxy_scene):
         """
         Returns the idx of a valid camera pose.
-        A pose is considered invalid iff it is either occupied (inside an object) or has an empty field of view.
+        A pose is considered invalid iff it has an empty field of view.
 
         :param mesh: (Mesh) Mesh of the object to reconstruct in the scene.
         :param proxy_scene (Scene)
@@ -2217,9 +2184,6 @@ class Camera:
             # Draw a random pose
             random_pose_key = np.random.choice(list(self.pose_space.keys()))
 
-            # Check if pose is occupied
-            pose_is_occupied = self.check_if_pose_is_occupied(random_pose_key, input_type='key')
-
             # Check if pose has an empty field of view
             random_pose = self.pose_space[random_pose_key]
             X_cam, V_cam, fov_camera = self.get_camera_parameters_from_pose(random_pose)
@@ -2230,7 +2194,7 @@ class Camera:
                                                       fov_camera=fov_camera, fov_range=5 * self.zfar)
             no_proxy_in_fov = fov_proxy_points.shape[0] <= 0
 
-            is_not_valid = empty_fov or pose_is_occupied or no_proxy_in_fov
+            is_not_valid = empty_fov or no_proxy_in_fov
 
         valid_pose_idx = self.get_idx_from_key(random_pose_key)
         return valid_pose_idx
@@ -3639,25 +3603,20 @@ class Camera:
         # Used for storing the params of valid sampled poses.
         sampled_poses_params_list = []
         for indices in sampled_poses_indices:
-            # Check if pose is occupied
-            # pose_is_occupied = self.check_if_pose_is_occupied(indices, input_type='key')
-            pose_is_occupied = False
+            # Check if pose has an empty field of view
+            random_pose = self.pose_space[indices]
+            X_cam, V_cam, fov_camera = self.get_camera_parameters_from_pose(random_pose) # Important
+            empty_fov = self.is_fov_empty(mesh, fov_camera)
 
-            if not pose_is_occupied:
-                # Check if pose has an empty field of view
-                random_pose = self.pose_space[indices]
-                X_cam, V_cam, fov_camera = self.get_camera_parameters_from_pose(random_pose) # Important
-                empty_fov = self.is_fov_empty(mesh, fov_camera)
+            if not empty_fov:
+            # Check if pose is oriented toward bounding box
+                fov_proxy_points = self.get_points_in_fov(pts=proxy_scene.proxy_points, return_mask=False,
+                                                        fov_camera=fov_camera, fov_range=5 * self.zfar)
+                no_proxy_in_fov = fov_proxy_points.shape[0] <= 0
 
-                if not empty_fov:
-                # Check if pose is oriented toward bounding box
-                    fov_proxy_points = self.get_points_in_fov(pts=proxy_scene.proxy_points, return_mask=False,
-                                                            fov_camera=fov_camera, fov_range=5 * self.zfar)
-                    no_proxy_in_fov = fov_proxy_points.shape[0] <= 0
-
-                    if not no_proxy_in_fov:
-                        params_list = [random_pose, X_cam, fov_camera, indices]
-                        sampled_poses_params_list.append(params_list)
+                if not no_proxy_in_fov:
+                    params_list = [random_pose, X_cam, fov_camera, indices]
+                    sampled_poses_params_list.append(params_list)
 
         return sampled_poses_params_list
     
@@ -3692,24 +3651,20 @@ class Camera:
         # Used for storing the params of valid sampled poses.
         sampled_poses_params_list = []
         for indices in sampled_poses_indices:
-            # Check if pose is occupied
-            pose_is_occupied = self.check_if_pose_is_occupied(indices, input_type='key')
+            # Check if pose has an empty field of view
+            random_pose = self.pose_space[indices]
+            X_cam, V_cam, fov_camera = self.get_camera_parameters_from_pose(random_pose) # Important
+            empty_fov = self.is_fov_empty(mesh, fov_camera)
 
-            if not pose_is_occupied:
-                # Check if pose has an empty field of view
-                random_pose = self.pose_space[indices]
-                X_cam, V_cam, fov_camera = self.get_camera_parameters_from_pose(random_pose) # Important
-                empty_fov = self.is_fov_empty(mesh, fov_camera)
+            if not empty_fov:
+            # Check if pose is oriented toward bounding box
+                fov_proxy_points = self.get_points_in_fov(pts=unknown_points, return_mask=False,
+                                                        fov_camera=fov_camera, fov_range=1.0 * self.zfar)
+                no_proxy_in_fov = fov_proxy_points.shape[0] <= 0
 
-                if not empty_fov:
-                # Check if pose is oriented toward bounding box
-                    fov_proxy_points = self.get_points_in_fov(pts=unknown_points, return_mask=False,
-                                                            fov_camera=fov_camera, fov_range=1.0 * self.zfar)
-                    no_proxy_in_fov = fov_proxy_points.shape[0] <= 0
-
-                    if not no_proxy_in_fov:
-                        params_list = [random_pose, X_cam, fov_camera, indices, fov_proxy_points.shape[0]]
-                        sampled_poses_params_list.append(params_list)
+                if not no_proxy_in_fov:
+                    params_list = [random_pose, X_cam, fov_camera, indices, fov_proxy_points.shape[0]]
+                    sampled_poses_params_list.append(params_list)
         sampled_poses_params_list.sort(key=lambda x: x[4], reverse=True)
 
         return sampled_poses_params_list
@@ -3759,34 +3714,30 @@ class Camera:
         candidate_viewpoints = []
         
         for indices in sampled_poses_indices:
+            random_pose = self.pose_space[indices]
+            X_cam, V_cam, fov_camera = self.get_camera_parameters_from_pose(random_pose)
+            empty_fov = self.is_fov_empty(mesh, fov_camera)
 
-            pose_is_occupied = self.check_if_pose_is_occupied(indices, input_type='key')
-            
-            if not pose_is_occupied:
-                random_pose = self.pose_space[indices]
-                X_cam, V_cam, fov_camera = self.get_camera_parameters_from_pose(random_pose)
-                empty_fov = self.is_fov_empty(mesh, fov_camera)
-                
-                if not empty_fov:
-                    # 获取视野内的未覆盖点
-                    fov_points, fov_mask = self.get_points_in_fov(
-                        pts=filtered_unknown_points, return_mask=True,
-                        fov_camera=fov_camera, fov_range=1.0 * self.zfar
-                    )
-                    
-                    if fov_points.shape[0] > 0:
-                        # 存储视点信息和其覆盖掩码
-                        viewpoint_info = {
-                            'pose': random_pose,
-                            'X_cam': X_cam,
-                            'V_cam': V_cam,
-                            'fov_camera': fov_camera,
-                            'idx': indices,
-                            'coverage_count': fov_points.shape[0],
-                            'coverage_mask': fov_mask,  # 对filtered_unknown_points的掩码
-                            'covered_points': fov_points
-                        }
-                        candidate_viewpoints.append(viewpoint_info)
+            if not empty_fov:
+                # Gather the uncovered points inside the field of view
+                fov_points, fov_mask = self.get_points_in_fov(
+                    pts=filtered_unknown_points, return_mask=True,
+                    fov_camera=fov_camera, fov_range=1.0 * self.zfar
+                )
+
+                if fov_points.shape[0] > 0:
+                    # Store the viewpoint info along with its coverage mask
+                    viewpoint_info = {
+                        'pose': random_pose,
+                        'X_cam': X_cam,
+                        'V_cam': V_cam,
+                        'fov_camera': fov_camera,
+                        'idx': indices,
+                        'coverage_count': fov_points.shape[0],
+                        'coverage_mask': fov_mask,  # Mask over filtered_unknown_points
+                        'covered_points': fov_points
+                    }
+                    candidate_viewpoints.append(viewpoint_info)
         
         # Step 3: 贪心选择互补的关键视点
         selected_viewpoints = []
@@ -4107,44 +4058,16 @@ class Camera:
         empty_fov = fov_verts.shape[0] <= 0
         return empty_fov
 
-    def check_if_pose_is_occupied(self, pose, input_type='idx'):
-        """
-        Return a boolean indicating if the pose is occupied or not in order to avoid collisions.
-
-        :param pose:
-        :param input_type: (str) Indicates which type of input is provided.
-        Can be 'idx', 'key'.
-        :return: (bool)
-        """
-
-        if self.use_occupied_pose:
-            if input_type == 'key':
-                pose_key = pose
-            elif input_type == 'idx':
-                pose_key = self.get_key_from_idx(pose)
-            else:
-                raise NameError("Wrong input_type argument. Please select between 'idx' and 'key'.")
-
-            X_key = '[' + ','.join(pose_key[1:-1].split(',')[:3]) + ']'
-            is_occupied = self.pose_is_occupied[X_key]
-        else:
-            is_occupied = False
-
-        return is_occupied
-
     def check_if_pose_is_valid(self, mesh, pose, input_type='idx'):
         """
         Return True if the camera pose is valid.
-        A pose is considered invalid iff it is either occupied or has an empty field of view.
+        A pose is considered invalid iff it has an empty field of view.
 
         :param mesh:
         :param pose:
         :param input_type: (str) Input type for pose argument. Can be 'idx' or 'key'.
         :return:
         """
-
-        # Check if pose is occupied
-        pose_is_occupied = self.check_if_pose_is_occupied(pose, input_type=input_type)
 
         # Check if pose has an empty field of view
         if input_type == 'idx':
@@ -4157,7 +4080,7 @@ class Camera:
         X_cam, V_cam, fov_camera = self.get_camera_parameters_from_pose(random_pose)
         empty_fov = self.is_fov_empty(mesh, fov_camera)
 
-        is_valid = not(empty_fov or pose_is_occupied)
+        is_valid = not empty_fov
         return is_valid
 
     def capture_image(self, mesh, fov_camera=None,

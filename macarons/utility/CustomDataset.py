@@ -311,10 +311,8 @@ class RGBDataset(Dataset):
 
 
 class SceneDataset(Dataset):
-    def __init__(self, data_path, scene_names=None,
-                 use_occupied_pose=True):
+    def __init__(self, data_path, scene_names=None):
         self.data_path = data_path
-        self.use_occupied_pose = use_occupied_pose
 
         # If no scene name is provided, we just take all scenes in the folder
         if scene_names is None:
@@ -354,10 +352,5 @@ class SceneDataset(Dataset):
         scene['scene_name'] = scene_name
         scene['obj_name'] = obj_name
         scene['settings'] = settings
-
-        # Info about occupied camera poses
-        if self.use_occupied_pose:
-            occupied_pose = torch.load(os.path.join(scene_path, 'occupied_pose.pt'), map_location=torch.device('cpu'))
-            scene['occupied_pose'] = occupied_pose
 
         return scene

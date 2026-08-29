@@ -70,6 +70,21 @@ Key parameters are in `configs/test/test_in_default_scenes_config.json`:
 | `beam_steps` | Beam search: lookahead depth (number of steps) |
 | `lmdb_dir_name` | Name of the output LMDB directory under `results/scene_exploration/` |
 
+#### Running on Matterport3D (mp3d)
+
+The default values above are tuned for the Macarons++ scenes. When running on mp3d
+scenes, set `dataset_path` in the test config to your mp3d data folder, and change
+the following under `_camera_management` in `configs/macarons/macarons_default_training_config.json`:
+
+| Parameter | Default | mp3d |
+|-----------|---------|------|
+| `image_width` | `456` | `1200` |
+| `image_height` | `256` | `680` |
+| `n_poses_in_trajectory` | `100` | `150` |
+
+The rendering resolution (1200 × 680) drives both the PyTorch3D rasterizer and the
+Gaussian rendering, so a single change propagates to the whole pipeline.
+
 ### 7. Evaluate Metrics
 
 ```bash

@@ -90,7 +90,6 @@ def setup_scene(params,
 def setup_camera(params,
                  mesh, proxy_scene,
                  settings,
-                 occupied_pose_data,
                  device, is_master,
                  training_frames_path,
                  mirrored_scene,
@@ -101,7 +100,6 @@ def setup_camera(params,
     :param params:
     :param mesh:
     :param settings:
-    :param occupied_pose_data:
     :param device:
     :param is_master:
     :return:
@@ -130,7 +128,6 @@ def setup_camera(params,
                     device=device,
                     contrast_factor=settings.camera.contrast_factor,
                     gathering_factor=params.gathering_factor,
-                    occupied_pose_data=occupied_pose_data,
                     save_dir_path=training_frames_path,
                     mirrored_scene=mirrored_scene,
                     mirrored_axis=mirrored_axis)  # Change or remove this path during inference or test
@@ -1049,7 +1046,6 @@ def train(params,
         scene_names = scene_dict['scene_name']
         obj_names = scene_dict['obj_name']
         all_settings = scene_dict['settings']
-        occupied_pose_datas = scene_dict['occupied_pose']
 
         batch_size = len(scene_names)
 
@@ -1062,7 +1058,6 @@ def train(params,
             obj_name = obj_names[i_scene]
             settings = all_settings[i_scene]
             settings = Settings(settings, device, params.scene_scale_factor)
-            occupied_pose_data = occupied_pose_datas[i_scene]
             print("\nScene name:", scene_name)
             print("-------------------------------------")
 
@@ -1099,7 +1094,7 @@ def train(params,
                                                                mirrored_scene, device, is_master,
                                                                mirrored_axis=mirrored_axis)
 
-            camera = setup_camera(params, mesh, proxy_scene, settings, occupied_pose_data,
+            camera = setup_camera(params, mesh, proxy_scene, settings,
                                   device, is_master, training_frames_path, mirrored_scene, mirrored_axis=mirrored_axis)
 
             # Compute curriculum sampling distances for occupancy supervision

@@ -63,7 +63,6 @@ class GlobalParameters:
         self.scene_dict = None
         self.scene_name = None
         self.settings = None
-        self.occupied_pose_data = None
 
         # Mesh object and data
         self.mesh = None
@@ -177,7 +176,6 @@ def load_selected(scene_name, model_name, config_name):
         global_params.settings = global_params.scene_dict['settings']
         global_params.settings = Settings(global_params.settings, global_params.device,
                                           global_params.params.scene_scale_factor)
-        global_params.occupied_pose_data = global_params.scene_dict['occupied_pose']
 
         global_params.mesh_path = os.path.join(global_params.scene_path, global_params.obj_name)
 
@@ -215,7 +213,6 @@ def load_selected(scene_name, model_name, config_name):
                                                  global_params.mesh,
                                                  global_params.start_cam_idx,
                                                  global_params.settings,
-                                                 global_params.occupied_pose_data,
                                                  global_params.device,
                                                  global_params.training_frames_path,
                                                  mirrored_scene=False,
