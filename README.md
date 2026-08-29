@@ -173,12 +173,11 @@ Here is what each parameter means:
 - `start_positions` — a list of 5 randomly sampled starting poses (each encoded as a 5D grid index `[l, w, h, theta, azim]`), used to initialise independent exploration trajectories.
 - `contrast_factor` — a rendering contrast factor applied to captured images.
 
-4. Also copy `occupied_pose.pt` from a reference scene as a starting point.
-5. Add your scene name to `test_scenes` in `configs/test/test_in_default_scenes_config.json`:
+4. Add your scene name to `test_scenes` in `configs/test/test_in_default_scenes_config.json`:
    ```json
    "test_scenes": ["neuschwanstein", ..., "power_facility"]
    ```
-6. Run MAGICIAN as usual:
+5. Run MAGICIAN as usual:
    ```bash
    python test_magician_planning.py
    ```
