@@ -52,10 +52,11 @@ Both datasets are hosted [here](https://huggingface.co/datasets/sli016/Macarons-
 Download the one you want, unzip it, and place the resulting folder under a `data/`
 folder in the project root:
 
-| Archive | Unzips to | Scenes |
-|---------|-----------|--------|
+| Archive | Unzips to | Contents |
+|---------|-----------|----------|
 | `Macarons++.zip` | `data/Macarons++/` | 15 large outdoor scenes |
 | `mp3d_magician.zip` | `data/mp3d_magician/` | 5 Matterport3D indoor scenes |
+| `novel_views.zip` | `data/novel_views/` | Held-out novel views for the 15 Macarons++ scenes, used to evaluate novel view synthesis |
 
 ```bash
 mkdir -p data && cd data
@@ -124,6 +125,56 @@ The LMDB file (specified by `lmdb_dir_name`) stores the following data for each 
 - **Coverage update history**: how coverage evolves step by step
 - **Camera poses**: the full history of visited camera positions
 - **Final point cloud**: the reconstructed point cloud at the end of the trajectory
+
+### 8. Gaussians and Mesh
+
+The images captured along a MAGICIAN trajectory, together with their camera poses,
+can be handed to [MILo](https://github.com/Anttwo/MILo) to reconstruct Gaussians and
+a mesh. MILo expects a COLMAP reconstruction, so the cameras have to be converted
+first — that is what `tools/` is for.
+
+Arrange the captured images and poses as a scene directory:
+
+```
+<scene_dir>/
+├── images/            # RGB frames captured along the trajectory (.png)
+├── test_gs.json       # camera poses: X_cam_history, V_cam_history
+└── test_gs_pc.json    # reconstructed point cloud: points, colors
+```
+
+Zero-pad the frame names so that lexicographic order matches capture order, then
+convert to COLMAP:
+
+```bash
+cd tools
+
+python rename.py --image_folder <scene_dir>/images
+
+python convert_to_colmap.py \
+  --scene_dir <scene_dir> \
+  --width 456 --height 256          # use 1200 x 680 for mp3d scenes
+```
+
+This writes `<scene_dir>/sparse/0/` (COLMAP `cameras`/`images`/`points3D` in both
+binary and text form, plus `points.ply`). Useful options:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--json_path` | `<scene_dir>/test_gs.json` | Camera pose JSON |
+| `--pc_json_path` | `<scene_dir>/test_gs_pc.json` | Point cloud JSON |
+| `--width`, `--height` | `456`, `256` | Must match the resolution the frames were captured at |
+| `--normalization_divider` | `20.0` | Divides camera positions and points to bring the scene into a range MILo is comfortable with |
+| `--zfar` | `750` | Far plane used to rebuild the projection matrix |
+
+All-white frames are dropped automatically, and the cameras that go with them are
+removed too.
+
+The scripts import each other as top-level modules, so run them from inside
+`tools/`. They need `pycolmap`, `trimesh` and `pytorch3d` in addition to the
+MAGICIAN environment.
+
+Finally, point MILo at `<scene_dir>` and follow its README to optimise the
+Gaussians and extract the mesh.
 
 ## Exploring Arbitrary 3D Scenes
 
