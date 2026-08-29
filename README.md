@@ -48,7 +48,35 @@ cd ../../..
 
 ### 3. Dataset
 
-Download the dataset [here](https://huggingface.co/datasets/sli016/Macarons-plus-plus/tree/main) and place it under a `data/` folder in the project root.
+Both datasets are hosted [here](https://huggingface.co/datasets/sli016/Macarons-plus-plus/tree/main).
+Download the one you want, unzip it, and place the resulting folder under a `data/`
+folder in the project root:
+
+| Archive | Unzips to | Scenes |
+|---------|-----------|--------|
+| `Macarons++.zip` | `data/Macarons++/` | 15 large outdoor scenes |
+| `mp3d_magician.zip` | `data/mp3d_magician/` | 5 Matterport3D indoor scenes |
+
+```bash
+mkdir -p data && cd data
+unzip mp3d_magician.zip      # -> data/mp3d_magician/{GdvgFV5R1Z5,gZ6f7yhEvPG,HxpKQynjfin,pLe4wQe7qrG,YmJkqBEsHnH}
+```
+
+Each scene folder contains the mesh (`.obj` + `.mtl` + textures) and a `settings.json`
+describing the scene bounding box and the camera action space.
+
+For mp3d, point the test config at the folder and list the scenes you want to explore
+in `configs/test/test_in_default_scenes_config.json`:
+
+```json
+{
+  "dataset_path": "./data/mp3d_magician",
+  "test_scenes": ["GdvgFV5R1Z5", "gZ6f7yhEvPG", "HxpKQynjfin", "pLe4wQe7qrG", "YmJkqBEsHnH"]
+}
+```
+
+mp3d scenes also need a different render resolution and trajectory length — see
+[Configuration](#6-configuration) below.
 
 ### 4. Pretrained Weights
 
@@ -72,9 +100,9 @@ Key parameters are in `configs/test/test_in_default_scenes_config.json`:
 
 #### Running on Matterport3D (mp3d)
 
-The default values above are tuned for the Macarons++ scenes. When running on mp3d
-scenes, set `dataset_path` in the test config to your mp3d data folder, and change
-the following under `_camera_management` in `configs/macarons/macarons_default_training_config.json`:
+The default values above are tuned for the Macarons++ scenes. After pointing
+`dataset_path` at `./data/mp3d_magician` (see [Dataset](#3-dataset)), also change the
+following under `_camera_management` in `configs/macarons/macarons_default_training_config.json`:
 
 | Parameter | Default | mp3d |
 |-----------|---------|------|
